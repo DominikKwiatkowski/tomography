@@ -10,6 +10,23 @@ from training.training_manager import run_training, RerunException
 from src.utils import create_model
 import torch
 import torch.multiprocessing as mp
+import os
+from datetime import datetime
+from typing import IO
+import sys
+
+class FileConsoleOut(object):
+    def __init__(self, *files):
+        self.files = files
+
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()
+
+    def flush(self):
+        for f in self.files:
+            f.flush()
 
 
 def training_arg_parser() -> argparse.Namespace:
@@ -44,13 +61,7 @@ def training_arg_parser() -> argparse.Namespace:
 def main():
     mp.set_start_method("spawn", force=True)
     args = training_arg_parser()
-
-    if torch.cuda.is_available():
-        print("CUDA is available")
-    else:
-        print("CUDA is not available")
-
-    device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
+    root_path = os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/../")
 
     name_params = [
         f"net_name-{args.net_name}"
@@ -62,6 +73,28 @@ def main():
         f"fold-{args.fold}",
         f"lr-{args.learning_rate}",
     ]
+    name_params = filter(None, name_params)
+    base_name = "_".join(name_params)
+
+    now = datetime.now()
+    timestamp = now.strftime("%d_%m_%Y__%H_%M_%S")
+    log_dir = os.path.join(root_path, f"{timestamp}_{base_name}")
+    if os.path.exists(log_dir):
+        print("Log dir already exists")
+        exit()
+    os.makedirs(log_dir)
+    log_file: IO = open(f"{log_dir}/log.log", "w")
+    original_out = sys.stdout
+    sys.stdout = FileConsoleOut(original_out, log_file)
+
+    if torch.cuda.is_available():
+        print("CUDA is available")
+    else:
+        print("CUDA is not available")
+
+    device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
+
+
 
     metadata = load_metadata(args.metadata)
 
@@ -85,8 +118,6 @@ def main():
     )
     test_dataset = dataset.create_data_loader(test, args.batch_size)
 
-    name_params = filter(None, name_params)
-    base_name = "_".join(name_params)
     rerun = 0
     finished = False
     while not finished:
@@ -122,6 +153,8 @@ def main():
             test_config = TestingConfig(args.batch_size, args.multiclass, model)
             run_test(name, test_config, device, test_dataset)
 
+    sys.stdout = original_out
+    log_file.close()
 
 if __name__ == "__main__":
     main()

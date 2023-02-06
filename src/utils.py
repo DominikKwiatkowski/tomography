@@ -35,18 +35,18 @@ def calc_metrics(
     device: torch.device,
     num_of_classes: int,
 ) -> None:
-    dice_score = 0
     dice_coeff_metric = Dice().to(device)
-    for i in range(num_of_classes):
-        # Ignore background
-        if num_of_classes > 1 and i == 0:
-            continue
-        elif num_of_classes == 1:
-            dice_score = dice_coeff_metric(pred, target)
-        else:
-            dice_score += dice_coeff_metric(pred[:, i], target[:, i])
-    divisor = num_of_classes - 1 if num_of_classes > 1 else 1
-    metrics["dice"] += (dice_score.item() / divisor) * target.size(0)  # type: ignore
+    if num_of_classes == 1:
+        dice_score = dice_coeff_metric(pred, target)
+        metrics["dice"] += dice_score.item() * target.size(0)
+    else:
+        dice_liver = dice_coeff_metric(pred[:, 1], target[:, 1])
+        dice_tumor = dice_coeff_metric(pred[:, 2], target[:, 2])
+        dice_score = (dice_liver + dice_tumor) / 2
+
+        metrics["dice_liver"] += dice_liver.item() * target.size(0)
+        metrics["dice_tumor"] += dice_tumor.item() * target.size(0)
+        metrics["dice"] += dice_score.item() * target.size(0)
 
 
 def print_metrics(
