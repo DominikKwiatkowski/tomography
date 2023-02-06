@@ -1,4 +1,5 @@
 import torch
+import wandb
 from torch import nn
 
 
@@ -89,7 +90,7 @@ class DefC(nn.Module):
             torch.arange(-(self.kernel_size - 1) // 2, (self.kernel_size - 1) // 2 + 1),
             torch.arange(-(self.kernel_size - 1) // 2, (self.kernel_size - 1) // 2 + 1))
         p_n = torch.cat([torch.flatten(p_n_x), torch.flatten(p_n_y)], 0)
-        p_n = p_n.view(1, 2 * N, 1, 1).type(dtype)
+        p_n = p_n.view(1, 2 * N, 1, 1).type(dtype).to(f"cuda:{wandb.config.gpu}")
 
         return p_n
 
@@ -99,7 +100,7 @@ class DefC(nn.Module):
             torch.arange(1, w * self.stride + 1, self.stride))
         p_0_x = torch.flatten(p_0_x).view(1, 1, h, w).repeat(1, N, 1, 1)
         p_0_y = torch.flatten(p_0_y).view(1, 1, h, w).repeat(1, N, 1, 1)
-        p_0 = torch.cat([p_0_x, p_0_y], 1).type(dtype)
+        p_0 = torch.cat([p_0_x, p_0_y], 1).type(dtype).to(f"cuda:{wandb.config.gpu}")
 
         return p_0
 

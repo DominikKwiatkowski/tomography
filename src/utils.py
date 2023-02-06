@@ -193,7 +193,7 @@ def norm_point(point):
 
 
 def log_image(inputs, labels, outputs):
-    image_num = 2
+    image_num = 2 if inputs.shape[0] > 2 else 0
     # If output value less than 0.5, set to 0, else set to 1
     output_tres = torch.where(
         outputs[image_num] < 0.5,
