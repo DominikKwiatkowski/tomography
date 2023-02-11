@@ -33,10 +33,6 @@ def run_test(
         testing_config.net.eval()  # Set model to evaluate mode
         metrics: dict = defaultdict(float)
         test_samples = 0
-        if testing_config.classes > 1:
-            loss = utils.DiceLoss(ignore_index=0).to(device)
-        else:
-            loss = utils.DiceLoss().to(device)
         with tqdm(
             total=len(data_loader) * testing_config.batch_size,
             desc=f"Testing {weights_filename}",
@@ -49,7 +45,7 @@ def run_test(
                 outputs = testing_config.net(inputs)
                 # if it is first sample, save first image to tensorboard
 
-                loss_value = loss(outputs, labels)
+                loss_value = testing_config.loss(outputs, labels)
                 metrics["loss"] += loss_value.item() * inputs.size(0)
                 if test_samples == 0:
                     utils.log_image(inputs,labels, outputs)

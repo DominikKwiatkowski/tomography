@@ -7,7 +7,7 @@ from src.testing.testing_config import TestingConfig
 from src.testing.testing_manager import run_test
 from src.training.training_config import TrainingConfig
 from training.training_manager import run_training, RerunException
-from src.utils import create_model
+from src.utils import create_model, create_loss
 import torch
 import torch.multiprocessing as mp
 import os
@@ -49,6 +49,8 @@ def training_arg_parser() -> argparse.Namespace:
     parser.add_argument("--metadata", type=str, help="Metadata path", required=True)
     parser.add_argument("--dataset", type=str, help="Dataset path", required=True)
     parser.add_argument("--net_name", type=str, help="Network name", choices=["unet", "quanet", "defednet", "unetplusplus"], required=True)
+    parser.add_argument("--loss_name", type=str, help="Loss name",
+                        choices=["dice", "cross_entropy", "mix"], required=True)
     parser.add_argument("--tumor", action="store_true", help="Use tumor labels")
     parser.add_argument("--normalize", action="store_true", help="Normalize images")
     parser.add_argument(
@@ -64,14 +66,15 @@ def main():
     root_path = os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/../")
 
     name_params = [
-        f"net_name-{args.net_name}"
-        f"size-{args.img_size}",
-        f'{"multiclass" if args.multiclass else ""}',
-        f'{"tumor" if args.tumor else ""}',
-        f'{"normalize" if args.normalize else ""}',
-        f'{"discard" if args.discard else ""}',
-        f"fold-{args.fold}",
-        f"lr-{args.learning_rate}",
+        f"net_name-{args.net_name}_"
+        f"size-{args.img_size}_",
+        f'{"multiclass_" if args.multiclass else ""}',
+        f'{"tumor_" if args.tumor else ""}',
+        f'{"normalize_" if args.normalize else ""}',
+        f'{"discard_" if args.discard else ""}',
+        f"fold-{args.fold}_",
+        f"lr-{args.learning_rate}_",
+        f"loss-{args.loss_name}"
     ]
     name_params = filter(None, name_params)
     base_name = "_".join(name_params)
@@ -127,18 +130,20 @@ def main():
         wandb.run.name = f"{name}-{wandb.run.id}"
         try:
             model = create_model(args.net_name, args.multiclass).to(device)
+            loss = create_loss(args.loss_name).to(device)
             config = TrainingConfig(
                 args.batch_size,
                 args.epochs,
                 args.learning_rate,
                 args.multiclass,
-                model
+                model,
+                loss
             )
             run_training(
                 name,
                 config,
                 device,
-                folds_data_loaders[args.fold],
+                folds_data_loaders[args.fold]
             )
         except RerunException as e:
             rerun += 1
@@ -150,7 +155,7 @@ def main():
             raise e
         else:
             finished = True
-            test_config = TestingConfig(args.batch_size, args.multiclass, model)
+            test_config = TestingConfig(args.batch_size, args.multiclass, model, loss)
             run_test(name, test_config, device, test_dataset)
 
     sys.stdout = original_out

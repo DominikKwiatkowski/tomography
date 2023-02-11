@@ -7,6 +7,7 @@ class TestingConfig:
         batch_size: int,
         multiclass: bool,
         net: torch.nn.Module,
+        loss: torch.nn.Module
     ):
         # Batch size for training
         self.batch_size: int = batch_size
@@ -19,3 +20,4 @@ class TestingConfig:
         self.classes = 3 if multiclass else 1
         # Mode layers definition
         self.net = net
+        self.loss = loss

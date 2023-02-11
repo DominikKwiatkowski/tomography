@@ -98,7 +98,7 @@ class BinaryDiceLoss(nn.Module):
         Exception if unexpected reduction
     """
 
-    def __init__(self, smooth=1, p=2, reduction="mean"):
+    def __init__(self, smooth=1, p=1, reduction="mean"):
         super().__init__()
         self.smooth = smooth
         self.p = p
@@ -111,7 +111,7 @@ class BinaryDiceLoss(nn.Module):
         predict = predict.contiguous().view(predict.shape[0], -1)
         target = target.contiguous().view(target.shape[0], -1)
 
-        num = torch.sum(torch.mul(predict, target), dim=1) + self.smooth
+        num = torch.mul(torch.sum(torch.mul(predict, target), dim=1), 2) + self.smooth
         den = torch.sum(predict.pow(self.p) + target.pow(self.p), dim=1) + self.smooth
 
         loss = 1 - num / den
@@ -234,3 +234,25 @@ def log_image(inputs, labels, outputs):
             "class_labels": class_labels,
         }})
     wandb.log({"predictions": image})
+
+
+class MixLoss(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.lossDice = DiceLoss(ignore_index=0)
+        self.lossEntropy = nn.BCELoss()
+
+    def forward(self, predict, target):
+        return self.lossDice(predict, target) + self.lossEntropy(predict, target)
+
+
+def create_loss(name: str) -> nn.Module:
+    if name == "dice":
+        return DiceLoss()
+    elif name == "cross_entropy":
+        return nn.BCELoss()
+    elif name == "mix":
+        return MixLoss()
+    else:
+        raise ValueError("Unknown loss name")
+

@@ -46,7 +46,7 @@ class UNet(nn.Module):
         self.conv0_4 = VGGBlock(nb_filter[0]+nb_filter[1], nb_filter[0], nb_filter[0])
 
         self.final = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
-
+        self.sm = torch.nn.Sigmoid()
 
     def forward(self, input):
         x0_0 = self.conv0_0(input)
@@ -61,7 +61,7 @@ class UNet(nn.Module):
         x0_4 = self.conv0_4(torch.cat([x0_0, self.up(x1_3)], 1))
 
         output = self.final(x0_4)
-        return output
+        return self.sm(output)
 
 
 class NestedUNet(nn.Module):
@@ -94,6 +94,7 @@ class NestedUNet(nn.Module):
         self.conv1_3 = VGGBlock(nb_filter[1]*3+nb_filter[2], nb_filter[1], nb_filter[1])
 
         self.conv0_4 = VGGBlock(nb_filter[0]*4+nb_filter[1], nb_filter[0], nb_filter[0])
+        self.sm = torch.nn.Sigmoid()
 
         if self.deep_supervision:
             self.final1 = nn.Conv2d(nb_filter[0], num_classes, kernel_size=1)
@@ -125,12 +126,12 @@ class NestedUNet(nn.Module):
         x0_4 = self.conv0_4(torch.cat([x0_0, x0_1, x0_2, x0_3, self.up(x1_3)], 1))
 
         if self.deep_supervision:
-            output1 = self.final1(x0_1)
-            output2 = self.final2(x0_2)
-            output3 = self.final3(x0_3)
-            output4 = self.final4(x0_4)
+            output1 = self.sm(self.final1(x0_1))
+            output2 = self.sm(self.final2(x0_2))
+            output3 = self.sm(self.final3(x0_3))
+            output4 = self.sm(self.final4(x0_4))
             return [output1, output2, output3, output4]
 
         else:
-            output = self.final(x0_4)
+            output = self.sm(self.final(x0_4))
             return output

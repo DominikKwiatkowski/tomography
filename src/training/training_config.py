@@ -12,6 +12,7 @@ class TrainingConfig:
         learning_rate: float,
         multiclass: bool,
         net: torch.nn.Module,
+        loss: torch.nn.Module
     ):
         # Batch size for training
         self.batch_size: int = batch_size
@@ -50,3 +51,5 @@ class TrainingConfig:
             threshold=0.0000001,
             threshold_mode="abs",
         )
+
+        self.loss = loss

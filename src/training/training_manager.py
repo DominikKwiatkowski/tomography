@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from torch import optim
+from torch import optim, nn
 from torch.utils.data import DataLoader
 
 import src.utils as utils
@@ -47,10 +47,6 @@ def run_training(
             print("-" * 10)
 
             since = time.time()
-            if training_config.classes > 1:
-                loss = utils.DiceLoss(ignore_index=0).to(device)
-            else:
-                loss = utils.DiceLoss().to(device)
             # Each epoch has a training and validation phase
             for phase in ["train", "val"]:
                 if phase == "train":
@@ -70,17 +66,17 @@ def run_training(
                 ) as pbar:
                     for (inputs, labels) in data_loaders[phase]:
                         inputs = inputs.to(device, dtype=torch.float32)
-                        labels = labels.to(device, dtype=torch.long)
+                        labels = labels.to(device, dtype=torch.float32)
                         training_config.optimizer.zero_grad()
                         # forward
                         # track history if only in train
                         with torch.set_grad_enabled(phase == "train"):
                             outputs = training_config.net(inputs)
-                            loss_value = loss(outputs, labels)
+                            loss_value = training_config.loss(outputs, labels)
 
                             metrics["loss"] += loss_value.item() * inputs.size(0)
                             utils.calc_metrics(
-                                outputs, labels, metrics, device, training_config.classes
+                                outputs, labels.to(device, dtype=torch.long), metrics, device, training_config.classes
                             )
 
                             # backward + optimize only if in training phase

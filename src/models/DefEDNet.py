@@ -151,6 +151,7 @@ class DefED_Net(nn.Module):
         self.finalconv3 = SeparableConv2d(16, num_classes, 3, padding=1)
 
         self.drop = nn.Dropout2d(0.5)
+        self.sm = torch.nn.Sigmoid()
 
     def forward(self, x):
         # Encoder
@@ -194,4 +195,4 @@ class DefED_Net(nn.Module):
         out = self.finalrelu2(out)
         out = self.finalconv3(out)
 
-        return F.sigmoid(out)
+        return self.sm(out)
