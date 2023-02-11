@@ -239,7 +239,7 @@ def log_image(inputs, labels, outputs):
 class MixLoss(nn.Module):
     def __init__(self):
         super().__init__()
-        self.lossDice = DiceLoss(ignore_index=0)
+        self.lossDice = DiceLoss()
         self.lossEntropy = nn.BCELoss()
 
     def forward(self, predict, target):
