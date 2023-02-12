@@ -57,6 +57,7 @@ def training_arg_parser() -> argparse.Namespace:
         "--discard", action="store_true", help="Discard images with 100% background"
     )
     parser.add_argument("--multiclass", action="store_true", help="Use multiclass")
+    parser.add_argument("--early_stop", action="store_true", help="Use early stop")
     return parser.parse_args()
 
 

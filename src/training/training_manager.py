@@ -1,5 +1,6 @@
 from datetime import datetime
 
+import wandb
 from torch import optim, nn
 from torch.utils.data import DataLoader
 
@@ -107,7 +108,7 @@ def run_training(
             gc.collect()
             torch.cuda.empty_cache()
 
-            if phase == "val" and epoch >= 20 and epoch_dice < 0.5:
+            if wandb.config["early_stop"] and phase == "val" and epoch >= 20 and epoch_dice < 0.5:
                 raise RerunException(f"Dice under 50 in epoch {epoch}, rerunning")
 
     finally:
