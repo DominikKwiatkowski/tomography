@@ -40,7 +40,7 @@ def run_test(
         ) as pbar:
             for (inputs, labels) in data_loader:
                 inputs = inputs.to(device, dtype=torch.float32)
-                labels = labels.to(device, dtype=torch.long)
+                labels = labels.to(device, dtype=torch.float32)
 
                 outputs = testing_config.net(inputs)
                 # if it is first sample, save first image to tensorboard
@@ -50,7 +50,7 @@ def run_test(
                 if test_samples == 0:
                     utils.log_image(inputs,labels, outputs)
                 utils.calc_metrics(
-                    outputs, labels, metrics, device, testing_config.classes
+                    outputs, labels, labels.to(device, dtype=torch.long), device, testing_config.classes
                 )
 
                 test_samples += inputs.size(0)
