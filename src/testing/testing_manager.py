@@ -50,7 +50,7 @@ def run_test(
                 if test_samples == 0:
                     utils.log_image(inputs,labels, outputs)
                 utils.calc_metrics(
-                    outputs, labels, labels.to(device, dtype=torch.long), device, testing_config.classes
+                    outputs, labels.to(device, dtype=torch.long), metrics, device, testing_config.classes
                 )
 
                 test_samples += inputs.size(0)
