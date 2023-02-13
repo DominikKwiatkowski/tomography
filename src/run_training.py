@@ -98,8 +98,6 @@ def main():
 
     device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
 
-
-
     metadata = load_metadata(args.metadata)
 
     metadata.drop("series_id", axis=1, inplace=True)

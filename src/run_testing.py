@@ -60,8 +60,6 @@ def main():
     mp.set_start_method("spawn", force=True)
     args = training_arg_parser()
 
-
-
     file_name = args.name
     # name is only filename without path
     name = f"test_{os.path.basename(file_name)}"
@@ -81,14 +79,17 @@ def main():
         multiclass=args.multiclass,
     )
 
-    _, test = dataset.train_val_test_k_fold(0.2)
+    folds, test = dataset.train_val_test_k_fold(0.2)
+    folds_data_loaders = dataset.create_k_fold_data_loaders(
+        folds, batch_size=args.batch_size
+    )
     test_dataset = dataset.create_data_loader(test, args.batch_size)
 
     model = create_model(args.net_name, args.multiclass).to(device)
     loss = create_loss(args.loss_name).to(device)
 
     test_config = TestingConfig(args.batch_size, args.multiclass, model, loss)
-    wandb.init(project="master-thesis", entity="s175454", mode="offline")
+    wandb.init(project="master-thesis", entity="s175454", mode="online")
     wandb.config.update(args)
     wandb.run.name = f"{name}-{wandb.run.id}"
     run_test(file_name, test_config, device, test_dataset)
