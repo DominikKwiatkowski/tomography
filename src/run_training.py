@@ -126,7 +126,7 @@ def main():
     finished = False
     while not finished:
         name = base_name if rerun == 0 else f"{base_name}_rerun-{rerun}"
-        wandb.init(project="master-thesis", entity="s175454", mode="online")
+        wandb.init(project="master-thesis", entity="s175454", mode="offline")
         wandb.config.update(args)
         wandb.run.name = f"{name}-{wandb.run.id}"
         try:
