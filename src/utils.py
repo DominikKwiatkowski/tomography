@@ -77,11 +77,11 @@ def save_model(net: nn.Module, name: str) -> None:
     torch.save(net.state_dict(), os.path.join(wandb.run.dir, name))
 
 
-def load_model(net: nn.Module, name: str) -> None:
+def load_model(net: nn.Module, name: str, device) -> None:
     """
     Load the model from disk.
     """
-    net.load_state_dict(torch.load(os.path.join(wandb.run.dir, name)))
+    net.load_state_dict(torch.load(os.path.join(wandb.run.dir, name), map_location=device))
 
 class BinaryDiceLoss(nn.Module):
     r"""Dice loss of binary class

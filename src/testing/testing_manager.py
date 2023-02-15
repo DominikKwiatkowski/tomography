@@ -24,7 +24,7 @@ def run_test(
     :param data_loader: DataLoader object
     """
     print(f"Testing {weights_filename} on device: {device}")
-    utils.load_model(testing_config.net, weights_filename)
+    utils.load_model(testing_config.net, weights_filename, device)
 
     if torch.cuda.is_available():
         testing_config.net.cuda(device)
