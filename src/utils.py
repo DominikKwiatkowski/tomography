@@ -218,8 +218,13 @@ def log_image(inputs, labels, outputs):
         }
 
     # If multiclass, convert 3 channels to 1 channel, such as if first channel is 1, set to 0, if second channel is 1, set to 1, if third channel is 1, set to 2
-    output_tres = torch.argmax(output_tres, dim=0)
-    labels = torch.argmax(labels, dim=1)
+    if wandb.config["multiclass"]:
+        output_tres = torch.argmax(output_tres, dim=0)
+        labels = torch.argmax(labels, dim=1)
+    else:
+        # if not multiclass, remove second dimension
+        output_tres = output_tres.squeeze(0)
+        labels = labels.squeeze(1)
 
 
     # Log image with wandb
