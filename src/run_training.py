@@ -52,7 +52,8 @@ def training_arg_parser() -> argparse.Namespace:
     parser.add_argument("--loss_name", type=str, help="Loss name",
                         choices=["dice", "cross_entropy", "mix"], required=True)
     parser.add_argument("--tumor", action="store_true", help="Use tumor labels")
-    parser.add_argument("--normalize", action="store_true", help="Normalize images")
+    parser.add_argument("--ww", type=int, help="Window width", default=2560)
+    parser.add_argument("--wl", type=int, help="Window level", default=1536)
     parser.add_argument(
         "--discard", action="store_true", help="Discard images with 100% background"
     )
@@ -71,11 +72,12 @@ def main():
         f"size-{args.img_size}_",
         f'{"multiclass_" if args.multiclass else ""}',
         f'{"tumor_" if args.tumor else ""}',
-        f'{"normalize_" if args.normalize else ""}',
         f'{"discard_" if args.discard else ""}',
         f"fold-{args.fold}_",
         f"lr-{args.learning_rate}_",
-        f"loss-{args.loss_name}"
+        f"loss-{args.loss_name}",
+        f"ww-{args.ww}_",
+        f"wl-{args.wl}_",
     ]
     name_params = filter(None, name_params)
     base_name = "_".join(name_params)
@@ -107,9 +109,10 @@ def main():
         metadata,
         target_size=args.img_size,
         tumor=args.tumor,
-        normalize=args.normalize,
         discard=args.discard,
         multiclass=args.multiclass,
+        window_width=args.ww,
+        window_center=args.wl,
     )
 
     folds, test = dataset.train_val_test_k_fold(0.2)

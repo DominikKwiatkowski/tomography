@@ -23,9 +23,10 @@ class TomographyDataset(Dataset):
         transform=None,
         target_transform=None,
         tumor=False,
-        normalize=False,
         discard=False,
         multiclass=False,
+        window_width=2560,
+        window_center=1536,
     ):
         # Store metadata, 2 and 3 column change type to string_
         self.metadata = metadata
@@ -46,7 +47,8 @@ class TomographyDataset(Dataset):
 
         self.label_map_value = 2.0 if tumor is True else 1.0
         self.multiclass = multiclass
-        self.normalize = normalize
+        self.window_width = window_width
+        self.window_center = window_center
 
     def __len__(self):
         return len(self.metadata)
@@ -84,9 +86,9 @@ class TomographyDataset(Dataset):
             # check if label valuesare binary, if not, make them binary
             label = np.where(label_sampled > 0.5, 1, 0)
 
-        if self.normalize:
-            # Assuming that values are in range [-1024,4096], normalize to [-1,1]
-            image = norm_point(image)
+        # Apply winow width and center
+        image = np.clip(image, self.window_center - self.window_width, self.window_center + self.window_width)
+        image = (image - (self.window_center - self.window_width)) / self.window_width - 1
         if self.transform:
             image = self.transform(image)
         if self.target_transform:
