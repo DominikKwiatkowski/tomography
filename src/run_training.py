@@ -59,6 +59,7 @@ def training_arg_parser() -> argparse.Namespace:
     )
     parser.add_argument("--multiclass", action="store_true", help="Use multiclass")
     parser.add_argument("--early_stop", action="store_true", help="Use early stop")
+    parser.add_argument("--no_val", action="store_true", help="Remove validation set")
     return parser.parse_args()
 
 
@@ -78,6 +79,7 @@ def main():
         f"loss-{args.loss_name}",
         f"ww-{args.ww}_",
         f"wl-{args.wl}_",
+        f'{"no_val_" if args.no_val else ""}',
     ]
     name_params = filter(None, name_params)
     base_name = "_".join(name_params)
@@ -115,12 +117,16 @@ def main():
         window_center=args.wl,
     )
 
-    folds, test = dataset.train_val_test_k_fold(0.2)
-    print(folds)
+    if args.no_val:
+        train, test = dataset.train_val_test_k_fold(0.2, no_val=True)
+        train_dataset = {"train":dataset.create_data_loader(train, args.batch_size)}
+    else:
+        folds, test = dataset.train_val_test_k_fold(0.2)
+        print(folds)
 
-    folds_data_loaders = dataset.create_k_fold_data_loaders(
-        folds, batch_size=args.batch_size
-    )
+        folds_data_loaders = dataset.create_k_fold_data_loaders(
+            folds, batch_size=args.batch_size
+        )
     test_dataset = dataset.create_data_loader(test, args.batch_size)
 
     rerun = 0
@@ -141,12 +147,15 @@ def main():
                 model,
                 loss
             )
-            run_training(
-                name,
-                config,
-                device,
-                folds_data_loaders[args.fold]
-            )
+            if args.no_val:
+                run_training(name, config, device, train_dataset)
+            else:
+                run_training(
+                    name,
+                    config,
+                    device,
+                    folds_data_loaders[args.fold]
+                )
         except RerunException as e:
             rerun += 1
             print(e)
@@ -162,6 +171,7 @@ def main():
 
     sys.stdout = original_out
     log_file.close()
+
 
 if __name__ == "__main__":
     main()

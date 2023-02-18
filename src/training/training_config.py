@@ -1,3 +1,5 @@
+import copy
+
 from torch.optim.optimizer import Optimizer
 
 import torch
@@ -53,3 +55,5 @@ class TrainingConfig:
         )
 
         self.loss = loss
+        self.best_dice = 0.0
+        self.best_model_wts = copy.deepcopy(self.net.state_dict())

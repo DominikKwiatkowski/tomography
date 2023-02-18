@@ -33,11 +33,6 @@ def run_training(
     """
     print(f"Training {training_name} on device: {device}")
 
-    training_config.net.train()
-    best_model_wts = copy.deepcopy(training_config.net.state_dict())
-    best_dice = 0
-    global_step = 0
-
     if torch.cuda.is_available():
         training_config.net.cuda(device)
     print(sum(p.numel() for p in training_config.net.parameters() if p.requires_grad))
@@ -49,71 +44,24 @@ def run_training(
 
             since = time.time()
             # Each epoch has a training and validation phase
-            for phase in ["train", "val"]:
-                if phase == "train":
-                    for param_group in training_config.optimizer.param_groups:
-                        print("LR", param_group["lr"])
-
-                    training_config.net.train()  # Set model to training mode
-                else:
-                    training_config.net.eval()  # Set model to evaluate mode
-
-                metrics: dict = defaultdict(float)
-                epoch_samples = 0
-                with tqdm(
-                    total=len(data_loaders[phase]) * training_config.batch_size,
-                    desc=f"Epoch {epoch}/{training_config.epochs}",
-                    unit="img",
-                ) as pbar:
-                    for (inputs, labels) in data_loaders[phase]:
-                        inputs = inputs.to(device, dtype=torch.float32)
-                        labels = labels.to(device, dtype=torch.float32)
-                        training_config.optimizer.zero_grad()
-                        # forward
-                        # track history if only in train
-                        with torch.set_grad_enabled(phase == "train"):
-                            outputs = training_config.net(inputs)
-                            loss_value = training_config.loss(outputs, labels)
-
-                            metrics["loss"] += loss_value.item() * inputs.size(0)
-                            utils.calc_metrics(
-                                outputs, labels.to(device, dtype=torch.long), metrics, device, training_config.classes
-                            )
-
-                            # backward + optimize only if in training phase
-                            if phase == "train":
-                                loss_value.backward()
-                                training_config.optimizer.step()
-
-                        # statistics
-                        epoch_samples += inputs.size(0)
-                        pbar.update(inputs.size(0))
-                        global_step += 1
-                        pbar.set_postfix(**{"loss (batch)": loss_value.item()})
-
-                utils.print_metrics( metrics, epoch_samples, phase)
-                epoch_loss = metrics["loss"]
-                epoch_dice = metrics["dice"]
-
-                if phase == "val":
-                    training_config.scheduler.step(epoch_loss)
-
-                    if epoch_dice > best_dice:
-                        print("Saving model with best VAL DICE")
-                        best_dice = epoch_dice
-                        best_model_wts = copy.deepcopy(training_config.net.state_dict())
+            for param_group in training_config.optimizer.param_groups:
+                print("LR", param_group["lr"])
+            utils.run_training_epoch(training_config, data_loaders["train"], epoch, device)
+            if not wandb.config["no_val"]:
+                metrics = utils.run_val_epoch(training_config, data_loaders["val"], epoch, device)
+                if wandb.config["early_stop"] and epoch >= 20 and metrics["dice"] < 0.5:
+                    raise RerunException(f"Dice under 50 in epoch {epoch}, rerunning")
 
             time_elapsed = time.time() - since
             print("{:.0f}m {:.0f}s".format(time_elapsed // 60, time_elapsed % 60))
             gc.collect()
             torch.cuda.empty_cache()
 
-            if wandb.config["early_stop"] and phase == "val" and epoch >= 20 and epoch_dice < 0.5:
-                raise RerunException(f"Dice under 50 in epoch {epoch}, rerunning")
-
     finally:
-        print(f"Best val dice: {best_dice:4f}")
-        # load best model weights
-        training_config.net.load_state_dict(best_model_wts)
+        print(f"Best val dice: {training_config.best_dice:4f}")
+        # If we are not using validation, we will save the last model
+        if not wandb.config["no_val"]:
+            # load best model weights
+            training_config.net.load_state_dict(training_config.best_model_wts)
         # save model
         utils.save_model(training_config.net, training_name)

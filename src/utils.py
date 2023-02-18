@@ -1,13 +1,19 @@
+import copy
 import os
+from collections import defaultdict
 
 import torch
 import torch.nn as nn
 import wandb
+from torch.utils.data import DataLoader
 from torchmetrics import Dice
+from tqdm import tqdm
 
 from src.models.DefEDNet import DefED_Net
 from src.models.NestedUnet import UNet, NestedUNet
 from src.models.QAU_Net import QAU_Net
+from src.testing.testing_config import TestingConfig
+from src.training.training_config import TrainingConfig
 
 
 def multi_label_dice(
@@ -260,3 +266,72 @@ def create_loss(name: str) -> nn.Module:
     else:
         raise ValueError("Unknown loss name")
 
+
+def run_training_epoch(training_config: TrainingConfig, training_data_loader: DataLoader, epoch: int, device: torch.device):
+    training_config.net.train()
+    metrics: dict = defaultdict(float)
+    epoch_samples = 0
+    with tqdm(
+            total=len(training_data_loader) * training_config.batch_size,
+            desc=f"Epoch {epoch}/{training_config.epochs}",
+            unit="img",
+    ) as pbar:
+        for (inputs, labels) in training_data_loader:
+            inputs = inputs.to(device, dtype=torch.float32)
+            labels = labels.to(device, dtype=torch.float32)
+            training_config.optimizer.zero_grad()
+            outputs = training_config.net(inputs)
+            loss = training_config.loss(outputs, labels)
+            metrics["loss"] += loss.item() * inputs.size(0)
+            calc_metrics(
+                outputs, labels.to(device, dtype=torch.long), metrics, device, training_config.classes
+            )
+            loss.backward()
+            training_config.optimizer.step()
+            epoch_samples += inputs.size(0)
+            pbar.update(inputs.size(0))
+            pbar.set_postfix(**{"loss (batch)": loss.item()})
+    print_metrics(metrics, epoch_samples, "Train")
+    return metrics
+
+
+def eval_run(net: nn.Module, loss, eval_data_loader, epoch, device, batch_size,epochs, classes):
+    net.eval()
+    metrics: dict = defaultdict(float)
+    epoch_samples = 0
+    with torch.no_grad():
+        with tqdm(
+                total=len(eval_data_loader) * batch_size,
+                desc=f"Epoch {epoch}/{epochs}",
+                unit="img",
+        ) as pbar:
+            for (inputs, labels) in eval_data_loader:
+                inputs = inputs.to(device, dtype=torch.float32)
+                labels = labels.to(device, dtype=torch.float32)
+                outputs = net(inputs)
+                loss_value = loss(outputs, labels)
+                metrics["loss"] += loss_value.item() * inputs.size(0)
+                calc_metrics(
+                    outputs, labels.to(device, dtype=torch.long), metrics, device, classes
+                )
+                epoch_samples += inputs.size(0)
+                pbar.update(inputs.size(0))
+                pbar.set_postfix(**{"loss (batch)": loss_value.item()})
+        return metrics, epoch_samples
+
+
+def run_val_epoch(training_config: TrainingConfig, val_data_loader: DataLoader, epoch: int, device: torch.device):
+    metrics, epoch_samples = eval_run(training_config.net, training_config.loss, val_data_loader, epoch, device, training_config.batch_size, training_config.epochs, training_config.classes)
+    print_metrics(metrics, epoch_samples, "Val")
+    training_config.scheduler.step(metrics["loss"])
+    if metrics["dice"] > training_config.best_dice:
+        training_config.best_dice = metrics["dice"]
+        training_config.best_model_wts = copy.deepcopy(training_config.net.state_dict())
+        print(f"Best model saved with dice: {training_config.best_dice}")
+    return metrics
+
+
+def run_test_epoch(testing_config: TestingConfig, test_data_loader: DataLoader, device: torch.device):
+    metrics, epoch_samples = eval_run(testing_config.net, testing_config.loss, test_data_loader, 0, device, testing_config.batch_size, 1, testing_config.classes)
+    print_metrics(metrics, epoch_samples, "Test")
+    return metrics

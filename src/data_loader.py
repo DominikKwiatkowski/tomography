@@ -97,13 +97,14 @@ class TomographyDataset(Dataset):
         return image, label
 
     def train_val_test_k_fold(
-        self, test_ratio: float, k: int = 5, seed: int = 42
+        self, test_ratio: float, k: int = 5, seed: int = 42, no_val: bool = False
     ) -> Tuple[list, list]:
         """
         Split the dataset into train and test set by patient ids.
         :param test_ratio: float, ratio of test set size to whole dataset size
         :param k: folds number
         :param seed: int, seed for random state
+        :param no_val: bool, if True, then return only train and test set
         :return: train - list of train slice indexes, test - list of test slice indexes
         """
         np.random.seed(seed)
@@ -139,7 +140,8 @@ class TomographyDataset(Dataset):
         train, test = train_test_split(
             patient_ids, stratify=tumor_classes, random_state=seed, test_size=test_ratio
         )
-
+        if no_val:
+            return train, test
         train_patients = patients.iloc[train]
         patient_ids = train_patients.index.values.tolist()
         tumor_classes = train_patients["tumor_magnitude"].tolist()
