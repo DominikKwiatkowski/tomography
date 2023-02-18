@@ -15,7 +15,8 @@ from datetime import datetime
 from typing import IO
 import sys
 
-class FileConsoleOut(object):
+
+class FileConsoleOut:
     def __init__(self, *files):
         self.files = files
 
@@ -48,9 +49,20 @@ def training_arg_parser() -> argparse.Namespace:
     )
     parser.add_argument("--metadata", type=str, help="Metadata path", required=True)
     parser.add_argument("--dataset", type=str, help="Dataset path", required=True)
-    parser.add_argument("--net_name", type=str, help="Network name", choices=["unet", "quanet", "defednet", "unetplusplus"], required=True)
-    parser.add_argument("--loss_name", type=str, help="Loss name",
-                        choices=["dice", "cross_entropy", "mix"], required=True)
+    parser.add_argument(
+        "--net_name",
+        type=str,
+        help="Network name",
+        choices=["unet", "quanet", "defednet", "unetplusplus"],
+        required=True,
+    )
+    parser.add_argument(
+        "--loss_name",
+        type=str,
+        help="Loss name",
+        choices=["dice", "cross_entropy", "mix"],
+        required=True,
+    )
     parser.add_argument("--tumor", action="store_true", help="Use tumor labels")
     parser.add_argument("--ww", type=int, help="Window width", default=2560)
     parser.add_argument("--wl", type=int, help="Window level", default=1536)
@@ -69,8 +81,7 @@ def main():
     root_path = os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/../")
 
     name_params = [
-        f"net_name-{args.net_name}_"
-        f"size-{args.img_size}_",
+        f"net_name-{args.net_name}_" f"size-{args.img_size}_",
         f'{"multiclass_" if args.multiclass else ""}',
         f'{"tumor_" if args.tumor else ""}',
         f'{"discard_" if args.discard else ""}',
@@ -119,7 +130,7 @@ def main():
 
     if args.no_val:
         train, test = dataset.train_val_test_k_fold(0.2, no_val=True)
-        train_dataset = {"train":dataset.create_data_loader(train, args.batch_size)}
+        train_dataset = {"train": dataset.create_data_loader(train, args.batch_size)}
     else:
         folds, test = dataset.train_val_test_k_fold(0.2)
         print(folds)
@@ -145,17 +156,12 @@ def main():
                 args.learning_rate,
                 args.multiclass,
                 model,
-                loss
+                loss,
             )
             if args.no_val:
                 run_training(name, config, device, train_dataset)
             else:
-                run_training(
-                    name,
-                    config,
-                    device,
-                    folds_data_loaders[args.fold]
-                )
+                run_training(name, config, device, folds_data_loaders[args.fold])
         except RerunException as e:
             rerun += 1
             print(e)

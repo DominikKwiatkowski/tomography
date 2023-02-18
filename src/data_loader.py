@@ -79,7 +79,7 @@ class TomographyDataset(Dataset):
 
         if self.target_size != image.shape[1]:
             factor = int(image.shape[1] / self.target_size)
-            filter = np.ones((1, factor, factor)) / (factor**2)
+            filter = np.ones((1, factor, factor)) / (factor ** 2)
             # reshape all images and labels to target size using downscaling
             image = convolve(image, filter)[:, 0::factor, 0::factor]
             label_sampled = convolve(label, filter)[:, 0::factor, 0::factor]
@@ -87,8 +87,14 @@ class TomographyDataset(Dataset):
             label = np.where(label_sampled > 0.5, 1, 0)
 
         # Apply winow width and center
-        image = np.clip(image, self.window_center - self.window_width, self.window_center + self.window_width)
-        image = (image - (self.window_center - self.window_width)) / self.window_width - 1
+        image = np.clip(
+            image,
+            self.window_center - self.window_width,
+            self.window_center + self.window_width,
+        )
+        image = (
+            image - (self.window_center - self.window_width)
+        ) / self.window_width - 1
         if self.transform:
             image = self.transform(image)
         if self.target_transform:

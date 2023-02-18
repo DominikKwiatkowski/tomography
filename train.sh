@@ -20,4 +20,3 @@ nohup $( \
         python ./src/run_training.py --ww=225 --wl=25 --discard --batch_size=4 --epochs=50 --gpu=6 --fold=0 --learning_rate=0.0001 --img_size=512 --metadata="/home/macierz/s175454/lits_prepared/metadata.csv" --dataset="/home/macierz/s175454/lits_prepared" --net_name=quanet --loss_name=cross_entropy &>> global.log; \
         python ./src/run_training.py --ww=225 --wl=25 --discard --batch_size=4 --epochs=50 --gpu=6 --fold=0 --learning_rate=0.0001 --img_size=512 --metadata="/home/macierz/s175454/lits_prepared/metadata.csv" --dataset="/home/macierz/s175454/lits_prepared" --net_name=unetplusplus --loss_name=cross_entropy &>> global.log \
        ) &
-

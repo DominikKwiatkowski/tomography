@@ -7,11 +7,28 @@ from .defconv import DefC
 
 
 class SeparableConv2d(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size=1, stride=1, padding=0, dilation=1, bias=False):
-        super(SeparableConv2d, self).__init__()
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size=1,
+        stride=1,
+        padding=0,
+        dilation=1,
+        bias=False,
+    ):
+        super().__init__()
 
-        self.conv1 = nn.Conv2d(in_channels, in_channels, kernel_size, stride, padding, dilation, groups=in_channels,
-                               bias=bias)
+        self.conv1 = nn.Conv2d(
+            in_channels,
+            in_channels,
+            kernel_size,
+            stride,
+            padding,
+            dilation,
+            groups=in_channels,
+            bias=bias,
+        )
         self.pointwise = nn.Conv2d(in_channels, out_channels, 1, 1, 0, 1, 1, bias=bias)
 
     def forward(self, x):
@@ -25,19 +42,31 @@ nonlinearity = partial(F.relu, inplace=True)
 
 class Ladder_ASPP(nn.Module):
     def __init__(self, channel):
-        super(Ladder_ASPP, self).__init__()
-        self.dilate1 = SeparableConv2d(channel, channel, kernel_size=3, dilation=1, padding=1)
-        self.dilate2 = SeparableConv2d(channel * 2, channel, kernel_size=3, dilation=2, padding=2)
-        self.dilate3 = SeparableConv2d(channel * 3, channel, kernel_size=3, dilation=5, padding=5)
-        self.dilate4 = SeparableConv2d(channel * 4, channel, kernel_size=3, dilation=7, padding=7)
+        super().__init__()
+        self.dilate1 = SeparableConv2d(
+            channel, channel, kernel_size=3, dilation=1, padding=1
+        )
+        self.dilate2 = SeparableConv2d(
+            channel * 2, channel, kernel_size=3, dilation=2, padding=2
+        )
+        self.dilate3 = SeparableConv2d(
+            channel * 3, channel, kernel_size=3, dilation=5, padding=5
+        )
+        self.dilate4 = SeparableConv2d(
+            channel * 4, channel, kernel_size=3, dilation=7, padding=7
+        )
         self.bn = nn.BatchNorm2d(channel)
         self.drop = nn.Dropout2d(0.5)
         self.sg = nn.Sigmoid()
 
         self.finalchannel = channel
 
-        self.conv1x1_1 = SeparableConv2d(channel * 5, channel * 3, kernel_size=1, dilation=1, padding=0)
-        self.conv1x1_2 = SeparableConv2d(channel * 3, channel * 2, kernel_size=1, dilation=1, padding=0)
+        self.conv1x1_1 = SeparableConv2d(
+            channel * 5, channel * 3, kernel_size=1, dilation=1, padding=0
+        )
+        self.conv1x1_2 = SeparableConv2d(
+            channel * 3, channel * 2, kernel_size=1, dilation=1, padding=0
+        )
 
         # Master branch
         self.conv_master = SeparableConv2d(channel, channel, kernel_size=1, bias=False)
@@ -86,17 +115,23 @@ class Ladder_ASPP(nn.Module):
 
 class DecoderBlock(nn.Module):
     def __init__(self, in_channels, n_filters):
-        super(DecoderBlock, self).__init__()
+        super().__init__()
 
-        self.conv1 = SeparableConv2d(in_channels, in_channels // 4, kernel_size=3, stride=1, padding=1)
+        self.conv1 = SeparableConv2d(
+            in_channels, in_channels // 4, kernel_size=3, stride=1, padding=1
+        )
         self.norm1 = nn.BatchNorm2d(in_channels // 4)
         self.relu1 = nonlinearity
 
-        self.deconv2 = nn.ConvTranspose2d(in_channels // 4, in_channels // 4, 3, stride=2, padding=1, output_padding=1)
+        self.deconv2 = nn.ConvTranspose2d(
+            in_channels // 4, in_channels // 4, 3, stride=2, padding=1, output_padding=1
+        )
         self.norm2 = nn.BatchNorm2d(in_channels // 4)
         self.relu2 = nonlinearity
 
-        self.conv3 = SeparableConv2d(in_channels // 4, n_filters, kernel_size=3, stride=1, padding=1)
+        self.conv3 = SeparableConv2d(
+            in_channels // 4, n_filters, kernel_size=3, stride=1, padding=1
+        )
         self.norm3 = nn.BatchNorm2d(n_filters)
         self.relu3 = nonlinearity
 
@@ -115,7 +150,7 @@ class DecoderBlock(nn.Module):
 
 class DefED_Net(nn.Module):
     def __init__(self, num_classes=3):
-        super(DefED_Net, self).__init__()
+        super().__init__()
 
         filters = [64, 128, 256, 512, 1024]
 

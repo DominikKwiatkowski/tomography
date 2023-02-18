@@ -1,6 +1,7 @@
 import copy
 import os
 from collections import defaultdict
+from typing import Tuple
 
 import torch
 import torch.nn as nn
@@ -55,9 +56,7 @@ def calc_metrics(
         metrics["dice"] += dice_score.item() * target.size(0)
 
 
-def print_metrics(
-        metrics: dict, epoch_samples: int, phase: str
-) -> None:
+def print_metrics(metrics: dict, epoch_samples: int, phase: str) -> None:
     """
     Print out the metrics to stdout.
     :param tb: SummaryWriter object to write to
@@ -83,11 +82,14 @@ def save_model(net: nn.Module, name: str) -> None:
     torch.save(net.state_dict(), os.path.join(wandb.run.dir, name))
 
 
-def load_model(net: nn.Module, name: str, device) -> None:
+def load_model(net: nn.Module, name: str, device: torch.device) -> None:
     """
     Load the model from disk.
     """
-    net.load_state_dict(torch.load(os.path.join(wandb.run.dir, name), map_location=device))
+    net.load_state_dict(
+        torch.load(os.path.join(wandb.run.dir, name), map_location=device)
+    )
+
 
 class BinaryDiceLoss(nn.Module):
     r"""Dice loss of binary class
@@ -223,7 +225,8 @@ def log_image(inputs, labels, outputs):
             1: "Liver",
         }
 
-    # If multiclass, convert 3 channels to 1 channel, such as if first channel is 1, set to 0, if second channel is 1, set to 1, if third channel is 1, set to 2
+    # If multiclass, convert 3 channels to 1 channel, such as if first channel is 1, set to 0,
+    # if second channel is 1, set to 1, if third channel is 1, set to 2
     if wandb.config["multiclass"]:
         output_tres = torch.argmax(output_tres, dim=0)
         labels = torch.argmax(labels, dim=1)
@@ -232,17 +235,20 @@ def log_image(inputs, labels, outputs):
         output_tres = output_tres.squeeze(0)
         labels = labels.squeeze(1)
 
-
     # Log image with wandb
-    image = wandb.Image(inputs[image_num].to("cpu").numpy(), masks={
-        "predictions": {
-            "mask_data": output_tres.to("cpu").numpy(),
-            "class_labels": class_labels,
+    image = wandb.Image(
+        inputs[image_num].to("cpu").numpy(),
+        masks={
+            "predictions": {
+                "mask_data": output_tres.to("cpu").numpy(),
+                "class_labels": class_labels,
+            },
+            "ground_truth": {
+                "mask_data": labels[image_num].to("cpu").numpy(),
+                "class_labels": class_labels,
+            },
         },
-        "ground_truth": {
-            "mask_data": labels[image_num].to("cpu").numpy(),
-            "class_labels": class_labels,
-        }})
+    )
     wandb.log({"predictions": image})
 
 
@@ -267,14 +273,19 @@ def create_loss(name: str) -> nn.Module:
         raise ValueError("Unknown loss name")
 
 
-def run_training_epoch(training_config: TrainingConfig, training_data_loader: DataLoader, epoch: int, device: torch.device):
+def run_training_epoch(
+    training_config: TrainingConfig,
+    training_data_loader: DataLoader,
+    epoch: int,
+    device: torch.device,
+) -> dict:
     training_config.net.train()
     metrics: dict = defaultdict(float)
     epoch_samples = 0
     with tqdm(
-            total=len(training_data_loader) * training_config.batch_size,
-            desc=f"Epoch {epoch}/{training_config.epochs}",
-            unit="img",
+        total=len(training_data_loader) * training_config.batch_size,
+        desc=f"Epoch {epoch}/{training_config.epochs}",
+        unit="img",
     ) as pbar:
         for (inputs, labels) in training_data_loader:
             inputs = inputs.to(device, dtype=torch.float32)
@@ -284,7 +295,11 @@ def run_training_epoch(training_config: TrainingConfig, training_data_loader: Da
             loss = training_config.loss(outputs, labels)
             metrics["loss"] += loss.item() * inputs.size(0)
             calc_metrics(
-                outputs, labels.to(device, dtype=torch.long), metrics, device, training_config.classes
+                outputs,
+                labels.to(device, dtype=torch.long),
+                metrics,
+                device,
+                training_config.classes,
             )
             loss.backward()
             training_config.optimizer.step()
@@ -295,15 +310,24 @@ def run_training_epoch(training_config: TrainingConfig, training_data_loader: Da
     return metrics
 
 
-def eval_run(net: nn.Module, loss, eval_data_loader, epoch, device, batch_size,epochs, classes):
+def eval_run(
+    net: nn.Module,
+    loss: nn.Module,
+    eval_data_loader: DataLoader,
+    epoch: int,
+    device: torch.device,
+    batch_size: int,
+    epochs: int,
+    classes: int,
+) -> Tuple[dict, int]:
     net.eval()
     metrics: dict = defaultdict(float)
     epoch_samples = 0
     with torch.no_grad():
         with tqdm(
-                total=len(eval_data_loader) * batch_size,
-                desc=f"Epoch {epoch}/{epochs}",
-                unit="img",
+            total=len(eval_data_loader) * batch_size,
+            desc=f"Epoch {epoch}/{epochs}",
+            unit="img",
         ) as pbar:
             for (inputs, labels) in eval_data_loader:
                 inputs = inputs.to(device, dtype=torch.float32)
@@ -312,7 +336,11 @@ def eval_run(net: nn.Module, loss, eval_data_loader, epoch, device, batch_size,e
                 loss_value = loss(outputs, labels)
                 metrics["loss"] += loss_value.item() * inputs.size(0)
                 calc_metrics(
-                    outputs, labels.to(device, dtype=torch.long), metrics, device, classes
+                    outputs,
+                    labels.to(device, dtype=torch.long),
+                    metrics,
+                    device,
+                    classes,
                 )
                 epoch_samples += inputs.size(0)
                 pbar.update(inputs.size(0))
@@ -320,8 +348,22 @@ def eval_run(net: nn.Module, loss, eval_data_loader, epoch, device, batch_size,e
         return metrics, epoch_samples
 
 
-def run_val_epoch(training_config: TrainingConfig, val_data_loader: DataLoader, epoch: int, device: torch.device):
-    metrics, epoch_samples = eval_run(training_config.net, training_config.loss, val_data_loader, epoch, device, training_config.batch_size, training_config.epochs, training_config.classes)
+def run_val_epoch(
+    training_config: TrainingConfig,
+    val_data_loader: DataLoader,
+    epoch: int,
+    device: torch.device,
+) -> dict:
+    metrics, epoch_samples = eval_run(
+        training_config.net,
+        training_config.loss,
+        val_data_loader,
+        epoch,
+        device,
+        training_config.batch_size,
+        training_config.epochs,
+        training_config.classes,
+    )
     print_metrics(metrics, epoch_samples, "Val")
     training_config.scheduler.step(metrics["loss"])
     if metrics["dice"] > training_config.best_dice:
@@ -331,7 +373,18 @@ def run_val_epoch(training_config: TrainingConfig, val_data_loader: DataLoader, 
     return metrics
 
 
-def run_test_epoch(testing_config: TestingConfig, test_data_loader: DataLoader, device: torch.device):
-    metrics, epoch_samples = eval_run(testing_config.net, testing_config.loss, test_data_loader, 0, device, testing_config.batch_size, 1, testing_config.classes)
+def run_test_epoch(
+    testing_config: TestingConfig, test_data_loader: DataLoader, device: torch.device
+) -> dict:
+    metrics, epoch_samples = eval_run(
+        testing_config.net,
+        testing_config.loss,
+        test_data_loader,
+        0,
+        device,
+        testing_config.batch_size,
+        1,
+        testing_config.classes,
+    )
     print_metrics(metrics, epoch_samples, "Test")
     return metrics

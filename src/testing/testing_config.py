@@ -7,7 +7,7 @@ class TestingConfig:
         batch_size: int,
         multiclass: bool,
         net: torch.nn.Module,
-        loss: torch.nn.Module
+        loss: torch.nn.Module,
     ):
         # Batch size for training
         self.batch_size: int = batch_size

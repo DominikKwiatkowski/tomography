@@ -14,6 +14,7 @@ from tqdm import tqdm
 import torch.nn.functional as F
 import gc
 
+
 class RerunException(Exception):
     pass
 
@@ -46,9 +47,13 @@ def run_training(
             # Each epoch has a training and validation phase
             for param_group in training_config.optimizer.param_groups:
                 print("LR", param_group["lr"])
-            utils.run_training_epoch(training_config, data_loaders["train"], epoch, device)
+            utils.run_training_epoch(
+                training_config, data_loaders["train"], epoch, device
+            )
             if not wandb.config["no_val"]:
-                metrics = utils.run_val_epoch(training_config, data_loaders["val"], epoch, device)
+                metrics = utils.run_val_epoch(
+                    training_config, data_loaders["val"], epoch, device
+                )
                 if wandb.config["early_stop"] and epoch >= 20 and metrics["dice"] < 0.5:
                     raise RerunException(f"Dice under 50 in epoch {epoch}, rerunning")
 
