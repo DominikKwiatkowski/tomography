@@ -14,6 +14,7 @@ import os
 from datetime import datetime
 from typing import IO
 import sys
+from prepare_polar_training import prepare_polar_images
 
 
 class FileConsoleOut:
@@ -72,6 +73,7 @@ def training_arg_parser() -> argparse.Namespace:
     parser.add_argument("--multiclass", action="store_true", help="Use multiclass")
     parser.add_argument("--early_stop", action="store_true", help="Use early stop")
     parser.add_argument("--no_val", action="store_true", help="Remove validation set")
+    parser.add_argument("--use_polar", action="store_true", help="Use polar images")
     return parser.parse_args()
 
 
@@ -128,6 +130,19 @@ def main():
         window_center=args.wl,
     )
 
+    if args.use_polar:
+        model = create_model(args.net_name, args.multiclass).to(device)
+        prepare_polar_images(
+            dataset,
+            base_name,
+            model,
+            args.batch_size,
+            basic_dir=root_path,
+            device=device,
+            multiclass=args.multiclass,
+        )
+        base_name = f"{base_name}polar"
+
     if args.no_val:
         train, test = dataset.train_val_test_k_fold(0.2, no_val=True)
         train_dataset = {"train": dataset.create_data_loader(train, args.batch_size)}
@@ -173,6 +188,7 @@ def main():
         else:
             finished = True
             test_config = TestingConfig(args.batch_size, args.multiclass, model, loss)
+            dataset.test_mode = True
             run_test(name, test_config, device, test_dataset)
 
     sys.stdout = original_out

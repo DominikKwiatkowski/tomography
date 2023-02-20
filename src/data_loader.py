@@ -5,13 +5,14 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 from torch.utils.data import DataLoader
-from torch.utils.data.sampler import SubsetRandomSampler, Sampler
-from sklearn.model_selection import KFold, StratifiedKFold
+from torch.utils.data.sampler import Sampler
+from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import train_test_split
 from typing import Dict, Tuple
-from scipy.ndimage import convolve
 from collections import Counter
-from src.utils import norm_point
+
+from src import data_utils
+from src import polar_transforms
 
 
 class TomographyDataset(Dataset):
@@ -49,58 +50,35 @@ class TomographyDataset(Dataset):
         self.multiclass = multiclass
         self.window_width = window_width
         self.window_center = window_center
+        self.polar = False
+        self.test_mode = False
 
     def __len__(self):
         return len(self.metadata)
 
     def __getitem__(self, idx):
-        image = np.load(
-            os.path.join(self.dataset_dir, str(self.metadata[idx][2], encoding="utf-8"))
-        )["arr_0"]
-        image = np.reshape(image, (1, image.shape[0], image.shape[1]))
-        label = np.load(
-            os.path.join(self.dataset_dir, str(self.metadata[idx][3], encoding="utf-8"))
-        )["arr_0"]
-        label = np.reshape(label, (1, label.shape[0], label.shape[1]))
-
-        #
-        if self.multiclass:
-            # Duplicate label map to create 3 channel label map
-            label = np.repeat(label, 3, axis=0)
-            # In first channel, sets 0 to 1, 1 to 0, 2 to 0
-            label[0, :, :] = np.where(label[0, :, :] == 0, 1, 0)
-            # In second channel, sets 0 to 0, 1 to 1, 2 to 0
-            label[1, :, :] = np.where(label[1, :, :] == 1, 1, 0)
-            # In third channel, sets 0 to 0, 1 to 0, 2 to 1
-            label[2, :, :] = np.where(label[2, :, :] == 2, 1, 0)
-
-        else:
-            label = np.where(label >= self.label_map_value, 1, 0)
-
-        if self.target_size != image.shape[1]:
-            factor = int(image.shape[1] / self.target_size)
-            filter = np.ones((1, factor, factor)) / (factor ** 2)
-            # reshape all images and labels to target size using downscaling
-            image = convolve(image, filter)[:, 0::factor, 0::factor]
-            label_sampled = convolve(label, filter)[:, 0::factor, 0::factor]
-            # check if label valuesare binary, if not, make them binary
-            label = np.where(label_sampled > 0.5, 1, 0)
-
-        # Apply winow width and center
-        image = np.clip(
-            image,
-            self.window_center - self.window_width,
-            self.window_center + self.window_width,
+        image, label = data_utils.load_image(
+            idx,
+            self.metadata,
+            self.dataset_dir,
+            self.target_size,
+            self.transform,
+            self.target_transform,
+            self.multiclass,
+            self.window_width,
+            self.window_center,
+            self.label_map_value,
         )
-        image = (
-            image - (self.window_center - self.window_width)
-        ) / self.window_width - 1
-        if self.transform:
-            image = self.transform(image)
-        if self.target_transform:
-            label = self.target_transform(label)
-
-        return image, label
+        if self.polar:
+            image = polar_transforms.to_polar(
+                image, (self.metadata[idx][7], self.metadata[idx][8])
+            )
+            if not self.test_mode:
+                label = polar_transforms.to_polar(
+                    label, (self.metadata[idx][7], self.metadata[idx][8])
+                )
+            return image, label, self.metadata[idx][7], self.metadata[idx][8]
+        return image, label, 0, 0
 
     def train_val_test_k_fold(
         self, test_ratio: float, k: int = 5, seed: int = 42, no_val: bool = False

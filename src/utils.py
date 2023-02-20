@@ -13,6 +13,7 @@ from tqdm import tqdm
 from src.models.DefEDNet import DefED_Net
 from src.models.NestedUnet import UNet, NestedUNet
 from src.models.QAU_Net import QAU_Net
+from src.polar_transforms import to_cart
 from src.testing.testing_config import TestingConfig
 from src.training.training_config import TrainingConfig
 
@@ -287,7 +288,7 @@ def run_training_epoch(
         desc=f"Epoch {epoch}/{training_config.epochs}",
         unit="img",
     ) as pbar:
-        for (inputs, labels) in training_data_loader:
+        for (inputs, labels, _, _) in training_data_loader:
             inputs = inputs.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.float32)
             training_config.optimizer.zero_grad()
@@ -319,6 +320,7 @@ def eval_run(
     batch_size: int,
     epochs: int,
     classes: int,
+    phase: str,
 ) -> Tuple[dict, int]:
     net.eval()
     metrics: dict = defaultdict(float)
@@ -329,10 +331,17 @@ def eval_run(
             desc=f"Epoch {epoch}/{epochs}",
             unit="img",
         ) as pbar:
-            for (inputs, labels) in eval_data_loader:
+            for (inputs, labels, center_x, center_y) in eval_data_loader:
                 inputs = inputs.to(device, dtype=torch.float32)
                 labels = labels.to(device, dtype=torch.float32)
                 outputs = net(inputs)
+                if phase == "test" and wandb.config["use_polar"]:
+                    outputs = outputs.cpu().detach().numpy()
+                    for i in range(outputs.shape[0]):
+                        outputs[i] = to_cart(
+                            outputs[i], (center_x[i].item(), center_y[i].item())
+                        )
+                    outputs = torch.from_numpy(outputs).to(device, dtype=torch.float32)
                 loss_value = loss(outputs, labels)
                 metrics["loss"] += loss_value.item() * inputs.size(0)
                 calc_metrics(
@@ -342,6 +351,15 @@ def eval_run(
                     device,
                     classes,
                 )
+                if phase == "test" and epoch_samples == 0:
+                    if wandb.config["use_polar"]:
+                        inputs = inputs.cpu().detach().numpy()
+                        for i in range(inputs.shape[0]):
+                            inputs[i] = to_cart(
+                                inputs[i], (center_x[i].item(), center_y[i].item())
+                            )
+                        inputs = torch.from_numpy(inputs)
+                    log_image(inputs, labels, outputs)
                 epoch_samples += inputs.size(0)
                 pbar.update(inputs.size(0))
                 pbar.set_postfix(**{"loss (batch)": loss_value.item()})
@@ -363,6 +381,7 @@ def run_val_epoch(
         training_config.batch_size,
         training_config.epochs,
         training_config.classes,
+        "val",
     )
     print_metrics(metrics, epoch_samples, "Val")
     training_config.scheduler.step(metrics["loss"])
@@ -385,6 +404,7 @@ def run_test_epoch(
         testing_config.batch_size,
         1,
         testing_config.classes,
+        "test",
     )
     print_metrics(metrics, epoch_samples, "Test")
     return metrics
