@@ -144,11 +144,11 @@ class TomographyDataset(Dataset):
 
         return folds, test
 
-    def create_k_fold_data_loaders(self, folds, batch_size):
+    def create_k_fold_data_loaders(self, folds, batch_size, seed=42):
         folds_data_loaders = []
         for fold in folds:
-            train_loader = self.create_data_loader(fold["train"], batch_size)
-            val_loader = self.create_data_loader(fold["val"], batch_size)
+            train_loader = self.create_data_loader(fold["train"], batch_size, seed=seed)
+            val_loader = self.create_data_loader(fold["val"], batch_size, seed=seed)
             data_loaders_dict = {"train": train_loader, "val": val_loader}
             folds_data_loaders.append(data_loaders_dict)
         return folds_data_loaders

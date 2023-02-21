@@ -74,6 +74,7 @@ def training_arg_parser() -> argparse.Namespace:
     parser.add_argument("--early_stop", action="store_true", help="Use early stop")
     parser.add_argument("--no_val", action="store_true", help="Remove validation set")
     parser.add_argument("--use_polar", action="store_true", help="Use polar images")
+    parser.add_argument("--seed", type=int, help="Seed of splitting images", default=42)
     return parser.parse_args()
 
 
@@ -93,6 +94,7 @@ def main():
         f"ww-{args.ww}_",
         f"wl-{args.wl}_",
         f'{"no_val_" if args.no_val else ""}',
+        f"seed-{args.seed}_",
     ]
     name_params = filter(None, name_params)
     base_name = "_".join(name_params)
@@ -144,22 +146,24 @@ def main():
         base_name = f"{base_name}polar"
 
     if args.no_val:
-        train, test = dataset.train_val_test_k_fold(0.2, no_val=True)
-        train_dataset = {"train": dataset.create_data_loader(train, args.batch_size)}
+        train, test = dataset.train_val_test_k_fold(0.2, no_val=True, seed=args.seed)
+        train_dataset = {
+            "train": dataset.create_data_loader(train, args.batch_size, seed=args.seed)
+        }
     else:
-        folds, test = dataset.train_val_test_k_fold(0.2)
+        folds, test = dataset.train_val_test_k_fold(0.2, seed=args.seed)
         print(folds)
 
         folds_data_loaders = dataset.create_k_fold_data_loaders(
-            folds, batch_size=args.batch_size
+            folds, batch_size=args.batch_size, seed=args.seed
         )
-    test_dataset = dataset.create_data_loader(test, args.batch_size)
-
+    test_dataset = dataset.create_data_loader(test, args.batch_size, seed=args.seed)
+    print(test)
     rerun = 0
     finished = False
     while not finished:
         name = base_name if rerun == 0 else f"{base_name}_rerun-{rerun}"
-        wandb.init(project="master-thesis", entity="s175454", mode="online")
+        wandb.init(project="master-thesis", entity="s175454", mode="offline")
         wandb.config.update(args)
         wandb.run.name = f"{name}-{wandb.run.id}"
         try:
