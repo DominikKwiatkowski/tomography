@@ -162,7 +162,7 @@ class TomographyDataset(Dataset):
             sampler = SubsetSequentialSampler(slice_ids)
 
         data_loader = DataLoader(
-            self, batch_size=batch_size, sampler=sampler, num_workers=2
+            self, batch_size=batch_size, sampler=sampler, num_workers=4
         )
         return data_loader
 
