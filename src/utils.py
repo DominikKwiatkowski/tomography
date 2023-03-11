@@ -1,7 +1,7 @@
 import copy
 import os
 from collections import defaultdict
-from typing import Tuple
+from typing import Tuple, Dict
 
 import torch
 import torch.nn as nn
@@ -16,6 +16,19 @@ from src.models.QAU_Net import QAU_Net
 from src.polar_transforms import to_cart
 from src.testing.testing_config import TestingConfig
 from src.training.training_config import TrainingConfig
+
+
+class TestingImages:
+    def __init__(self):
+        self.best_dice = 0.0
+        self.best_dice_img = None
+        self.best_dice_mask = None
+        self.best_dice_pred = None
+
+        self.worst_dice = 1.0
+        self.worst_dice_img = None
+        self.worst_dice_mask = None
+        self.worst_dice_pred = None
 
 
 def multi_label_dice(
@@ -34,6 +47,39 @@ def multi_label_dice(
     """
     dice = Dice(multiclass=True, num_classes=num_of_classes, ignore_index=0).to(device)
     return dice(preds, targets).item()
+
+
+def calc_dice_and_check(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    input: torch.Tensor,
+    imageStats: TestingImages,
+    device: torch.device,
+    num_of_classes: int,
+) -> TestingImages:
+    """
+    Calculate dice score for each image, if it is better/worse than previous best/worst,
+    update the image.
+    """
+    dice_coeff_metric = Dice().to(device)
+    for i in range(pred.shape[0]):
+        if num_of_classes == 1:
+            dice_score = dice_coeff_metric(pred[i], target[i]).item()
+        else:
+            dice_liver = dice_coeff_metric(pred[i, 1], target[i, 1]).item()
+            dice_tumor = dice_coeff_metric(pred[i, 2], target[i, 2]).item()
+            dice_score = (dice_liver + dice_tumor) / 2
+        if dice_score > imageStats.best_dice:
+            imageStats.best_dice = dice_score
+            imageStats.best_dice_img = input[i]
+            imageStats.best_dice_mask = target[i]
+            imageStats.best_dice_pred = pred[i]
+        if dice_score < imageStats.worst_dice and dice_score != 0:
+            imageStats.worst_dice = dice_score
+            imageStats.worst_dice_img = input[i]
+            imageStats.worst_dice_mask = target[i]
+            imageStats.worst_dice_pred = pred[i]
+    return imageStats
 
 
 def calc_metrics(
@@ -201,14 +247,7 @@ def norm_point(point):
     return (point + 1024) / 2560 - 1
 
 
-def log_image(inputs, labels, outputs):
-    image_num = 2 if inputs.shape[0] > 2 else 0
-    # If output value less than 0.5, set to 0, else set to 1
-    output_tres = torch.where(
-        outputs[image_num] < 0.5,
-        torch.zeros_like(outputs[0]),
-        torch.ones_like(outputs[0]),
-    )
+def get_class_labels() -> Dict[int, str]:
     if wandb.config["multiclass"]:
         class_labels = {
             0: "Background",
@@ -225,32 +264,64 @@ def log_image(inputs, labels, outputs):
             0: "Background",
             1: "Liver",
         }
+    return class_labels
 
-    # If multiclass, convert 3 channels to 1 channel, such as if first channel is 1, set to 0,
-    # if second channel is 1, set to 1, if third channel is 1, set to 2
+
+def log_image_to_wandb(pred, inputs, labels, name):
+    output_tres = torch.where(
+        pred < 0.5,
+        torch.zeros_like(pred),
+        torch.ones_like(pred),
+    )
+    class_labels = get_class_labels()
     if wandb.config["multiclass"]:
         output_tres = torch.argmax(output_tres, dim=0)
-        labels = torch.argmax(labels, dim=1)
+        labels = torch.argmax(labels, dim=0)
     else:
         # if not multiclass, remove second dimension
         output_tres = output_tres.squeeze(0)
-        labels = labels.squeeze(1)
-
-    # Log image with wandb
+        labels = labels.squeeze(0)
     image = wandb.Image(
-        inputs[image_num].to("cpu").numpy(),
+        inputs.to("cpu").numpy(),
         masks={
             "predictions": {
                 "mask_data": output_tres.to("cpu").numpy(),
                 "class_labels": class_labels,
             },
             "ground_truth": {
-                "mask_data": labels[image_num].to("cpu").numpy(),
+                "mask_data": labels.to("cpu").numpy(),
                 "class_labels": class_labels,
             },
         },
     )
-    wandb.log({"predictions": image})
+    wandb.log({name: image})
+
+
+def log_worst_and_best_images(
+    imageStats: TestingImages,
+) -> None:
+    log_image_to_wandb(
+        imageStats.best_dice_pred,
+        imageStats.best_dice_img,
+        imageStats.best_dice_mask,
+        "Best Dice",
+    )
+    log_image_to_wandb(
+        imageStats.worst_dice_pred,
+        imageStats.worst_dice_img,
+        imageStats.worst_dice_mask,
+        "Worst Dice",
+    )
+    wandb.log({"worst Dice": imageStats.worst_dice})
+    wandb.log({"best Dice": imageStats.best_dice})
+
+
+def log_image(inputs, labels, outputs):
+    image_num = 2 if inputs.shape[0] > 2 else 0
+    # If output value less than 0.5, set to 0, else set to 1
+    log_image_to_wandb(
+        outputs[image_num], inputs[image_num], labels[image_num], "Predictions"
+    )
 
 
 class MixLoss(nn.Module):
@@ -311,6 +382,13 @@ def run_training_epoch(
     return metrics
 
 
+def detransform_image(inputs, center_x, center_y):
+    inputs = inputs.cpu().detach().numpy()
+    for i in range(inputs.shape[0]):
+        inputs[i] = to_cart(inputs[i], (center_x[i].item(), center_y[i].item()))
+    return torch.from_numpy(inputs)
+
+
 def eval_run(
     net: nn.Module,
     loss: nn.Module,
@@ -325,6 +403,7 @@ def eval_run(
     net.eval()
     metrics: dict = defaultdict(float)
     epoch_samples = 0
+    image_stats = TestingImages()
     with torch.no_grad():
         with tqdm(
             total=len(eval_data_loader) * batch_size,
@@ -351,18 +430,24 @@ def eval_run(
                     device,
                     classes,
                 )
-                if phase == "test" and epoch_samples == 0:
+                if phase == "test":
                     if wandb.config["use_polar"]:
-                        inputs = inputs.cpu().detach().numpy()
-                        for i in range(inputs.shape[0]):
-                            inputs[i] = to_cart(
-                                inputs[i], (center_x[i].item(), center_y[i].item())
-                            )
-                        inputs = torch.from_numpy(inputs)
-                    log_image(inputs, labels, outputs)
+                        inputs = detransform_image(inputs, center_x, center_y)
+                    image_stats = calc_dice_and_check(
+                        outputs,
+                        labels.to(device, dtype=torch.long),
+                        inputs,
+                        image_stats,
+                        device,
+                        classes,
+                    )
+                    if epoch_samples == 0:
+                        log_image(inputs, labels, outputs)
                 epoch_samples += inputs.size(0)
                 pbar.update(inputs.size(0))
                 pbar.set_postfix(**{"loss (batch)": loss_value.item()})
+        if phase == "test":
+            log_worst_and_best_images(image_stats)
         return metrics, epoch_samples
 
 

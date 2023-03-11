@@ -3,6 +3,7 @@ import wandb
 
 from src.data_loader import TomographyDataset
 from src.prepare_dataset import load_metadata
+from src.prepare_polar_training import prepare_polar_images
 from src.testing.testing_config import TestingConfig
 from src.testing.testing_manager import run_test
 from src.training.training_config import TrainingConfig
@@ -66,16 +67,18 @@ def training_arg_parser() -> argparse.Namespace:
         "--discard", action="store_true", help="Discard images with 100% background"
     )
     parser.add_argument("--multiclass", action="store_true", help="Use multiclass")
+    parser.add_argument("--use_polar", action="store_true", help="Use polar images")
     return parser.parse_args()
 
 
 def main():
     mp.set_start_method("spawn", force=True)
     args = training_arg_parser()
+    root_path = os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/../")
 
     file_name = args.name
     # name is only filename without path
-    name = f"test_{os.path.basename(file_name)}"
+    name = f"{os.path.basename(file_name)}"
 
     device = torch.device(f"cuda:{args.gpu}" if torch.cuda.is_available() else "cpu")
     metadata = load_metadata(args.metadata)
@@ -93,8 +96,23 @@ def main():
         window_center=args.wl,
     )
 
-    _, test = dataset.train_val_test_k_fold(0.2)
+    if args.use_polar:
+        model = create_model(args.net_name, args.multiclass).to(device)
+        prepare_polar_images(
+            dataset,
+            name,
+            model,
+            args.batch_size,
+            basic_dir=root_path,
+            device=device,
+            multiclass=args.multiclass,
+        )
+        name = f"{name}polar"
+        file_name = f"{file_name}polar"
 
+    _, test = dataset.train_val_test_k_fold(0.2)
+    name = f"test{name}"
+    dataset.test_mode = True
     test_dataset = dataset.create_data_loader(test, args.batch_size)
 
     model = create_model(args.net_name, args.multiclass).to(device)
