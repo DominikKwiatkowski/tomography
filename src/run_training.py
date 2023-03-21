@@ -54,7 +54,7 @@ def training_arg_parser() -> argparse.Namespace:
         "--net_name",
         type=str,
         help="Network name",
-        choices=["unet", "quanet", "defednet", "unetplusplus"],
+        choices=["unet", "quanet", "defednet", "unetplusplus", "transformer"],
         required=True,
     )
     parser.add_argument(
@@ -133,7 +133,7 @@ def main():
     )
 
     if args.use_polar:
-        model = create_model(args.net_name, args.multiclass).to(device)
+        model = create_model(args.net_name, args.multiclass, args.img_size).to(device)
         prepare_polar_images(
             dataset,
             base_name,
@@ -167,7 +167,9 @@ def main():
         wandb.config.update(args)
         wandb.run.name = f"{name}-{wandb.run.id}"
         try:
-            model = create_model(args.net_name, args.multiclass).to(device)
+            model = create_model(args.net_name, args.multiclass, args.img_size).to(
+                device
+            )
             loss = create_loss(args.loss_name).to(device)
             config = TrainingConfig(
                 args.batch_size,

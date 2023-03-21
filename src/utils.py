@@ -6,6 +6,7 @@ from typing import Tuple, Dict
 import torch
 import torch.nn as nn
 import wandb
+import yaml
 from torch.utils.data import DataLoader
 from torchmetrics import Dice
 from tqdm import tqdm
@@ -16,6 +17,7 @@ from src.models.QAU_Net import QAU_Net
 from src.polar_transforms import to_cart
 from src.testing.testing_config import TestingConfig
 from src.training.training_config import TrainingConfig
+from src.models.transformer.factory import create_segmenter
 
 
 class TestingImages:
@@ -133,9 +135,7 @@ def load_model(net: nn.Module, name: str, device: torch.device) -> None:
     """
     Load the model from disk.
     """
-    net.load_state_dict(
-        torch.load(os.path.join(wandb.run.dir, name), map_location=device)
-    )
+    net.load_state_dict(torch.load(name, map_location=device))
 
 
 class BinaryDiceLoss(nn.Module):
@@ -219,7 +219,9 @@ class DiceLoss(nn.Module):
         return total_loss / (target.shape[1] - (0 if self.ignore_index is None else 1))
 
 
-def create_model(net_name: str = "", multiclass: bool = True) -> nn.Module:
+def create_model(
+    net_name: str = "", multiclass: bool = True, img_size: int = 512
+) -> nn.Module:
     if net_name == "unet":
         return UNet(
             input_channels=1,
@@ -239,6 +241,31 @@ def create_model(net_name: str = "", multiclass: bool = True) -> nn.Module:
             input_channels=1,
             num_classes=3 if multiclass else 1,
         ).float()
+    elif net_name == "transformer":
+
+        cfg = dict(
+            backbone="vit_base_patch16_384",
+            d_model=768,
+            decoder=dict(
+                drop_path_rate=0.1,
+                dropout=0.1,
+                n_cls=3 if multiclass else 1,
+                n_layers=12,
+                name="mask_transformer",
+            ),
+            distilled=False,
+            drop_path_rate=0.1,
+            dropout=0.0,
+            image_size=(img_size, img_size),
+            n_cls=3 if multiclass else 1,
+            n_layers=12,
+            n_heads=12,
+            patch_size=16,
+            normalization="vit",
+            channels=1,
+        )
+        return create_segmenter(cfg)
+
     else:
         raise ValueError("Unknown net name")
 

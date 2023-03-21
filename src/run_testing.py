@@ -68,6 +68,7 @@ def training_arg_parser() -> argparse.Namespace:
     )
     parser.add_argument("--multiclass", action="store_true", help="Use multiclass")
     parser.add_argument("--use_polar", action="store_true", help="Use polar images")
+    parser.add_argument("--seed", type=int, help="Seed of splitting images", default=42)
     return parser.parse_args()
 
 
@@ -97,7 +98,7 @@ def main():
     )
 
     if args.use_polar:
-        model = create_model(args.net_name, args.multiclass).to(device)
+        model = create_model(args.net_name, args.multiclass, args.img_size).to(device)
         prepare_polar_images(
             dataset,
             name,
@@ -110,12 +111,12 @@ def main():
         name = f"{name}polar"
         file_name = f"{file_name}polar"
 
-    _, test = dataset.train_val_test_k_fold(0.2)
+    _, test = dataset.train_val_test_k_fold(0.2, seed=args.seed)
     name = f"test{name}"
     dataset.test_mode = True
-    test_dataset = dataset.create_data_loader(test, args.batch_size)
+    test_dataset = dataset.create_data_loader(test, args.batch_size, seed=args.seed)
 
-    model = create_model(args.net_name, args.multiclass).to(device)
+    model = create_model(args.net_name, args.multiclass, args.img_size).to(device)
     loss = create_loss(args.loss_name).to(device)
 
     test_config = TestingConfig(args.batch_size, args.multiclass, model, loss)
