@@ -261,7 +261,6 @@ def create_model(
             n_layers=12,
             n_heads=12,
             patch_size=16,
-            normalization="vit",
             channels=1,
         )
         return create_segmenter(cfg)
