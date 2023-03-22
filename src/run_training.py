@@ -178,6 +178,10 @@ def main():
                 args.multiclass,
                 model,
                 loss,
+                optim_name="SGD" if args.net_name == "transformer" else "Adam",
+                scheduler_name="Polynomial"
+                if args.net_name == "transformer"
+                else "ReduceLROnPlateau",
             )
             if args.no_val:
                 run_training(name, config, device, train_dataset)

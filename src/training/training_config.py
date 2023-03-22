@@ -4,6 +4,9 @@ from torch.optim.optimizer import Optimizer
 
 import torch
 import torch.optim as optim
+from timm import optim as timm_optim
+
+from src.optim.scheduler import PolynomialLR
 
 
 class TrainingConfig:
@@ -15,6 +18,8 @@ class TrainingConfig:
         multiclass: bool,
         net: torch.nn.Module,
         loss: torch.nn.Module,
+        optim_name: str,
+        scheduler_name: str,
     ):
         # Batch size for training
         self.batch_size: int = batch_size
@@ -38,21 +43,40 @@ class TrainingConfig:
         # Mode layers definition
         self.net = net
         print(self.net)
-        self.grad_scaler = torch.cuda.amp.GradScaler(enabled=True)
+        # self.grad_scaler = torch.cuda.amp.GradScaler(enabled=True)
 
-        self.optimizer: Optimizer = optim.Adam(
-            self.net.parameters(),
-            lr=self.learning_rate,
-        )
+        if optim_name == "SGD":
+            self.optimizer = timm_optim.create_optimizer_v2(
+                self.net,
+                "sgd",
+                lr=self.learning_rate,
+                momentum=0.9,
+                weight_decay=0.0,
+            )
+        else:
+            self.optimizer = optim.Adam(
+                self.net.parameters(),
+                lr=self.learning_rate,
+            )
 
-        self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-            self.optimizer,
-            mode="min",
-            factor=0.1,
-            patience=self.learning_rate_patience,
-            threshold=0.0000001,
-            threshold_mode="abs",
-        )
+        if scheduler_name == "Polynomial":
+            self.scheduler = PolynomialLR(
+                self.optimizer,
+                step_size=1,
+                iter_warmup=0,
+                iter_max=self.epochs,
+                power=0.9,
+                min_lr=1e-5,
+            )
+        else:
+            self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+                self.optimizer,
+                mode="min",
+                factor=0.1,
+                patience=self.learning_rate_patience,
+                threshold=0.0000001,
+                threshold_mode="abs",
+            )
 
         self.loss = loss
         self.best_dice = 0.0
