@@ -3,7 +3,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from .utils import padding, unpadding
-from timm.models.layers import trunc_normal_
 
 
 class Segmenter(nn.Module):

@@ -53,13 +53,15 @@ class TrainingConfig:
                 momentum=0.9,
                 weight_decay=0.0,
             )
-        else:
+        elif optim_name == "Adam":
             self.optimizer = optim.Adam(
                 self.net.parameters(),
                 lr=self.learning_rate,
             )
-
-        if scheduler_name == "Polynomial":
+        else:
+            raise Exception(f"Optimizer {optim_name} not implemented")
+        self.scheduler_name = scheduler_name
+        if self.scheduler_name == "Polynomial":
             self.scheduler = PolynomialLR(
                 self.optimizer,
                 step_size=1,
@@ -68,7 +70,7 @@ class TrainingConfig:
                 power=0.9,
                 min_lr=1e-5,
             )
-        else:
+        elif self.scheduler_name == "ReduceLROnPlateau":
             self.scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
                 self.optimizer,
                 mode="min",
@@ -77,6 +79,8 @@ class TrainingConfig:
                 threshold=0.0000001,
                 threshold_mode="abs",
             )
+        else:
+            raise Exception(f"Scheduler {scheduler_name} not implemented")
 
         self.loss = loss
         self.best_dice = 0.0

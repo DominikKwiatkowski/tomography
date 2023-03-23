@@ -75,6 +75,10 @@ def training_arg_parser() -> argparse.Namespace:
     parser.add_argument("--no_val", action="store_true", help="Remove validation set")
     parser.add_argument("--use_polar", action="store_true", help="Use polar images")
     parser.add_argument("--seed", type=int, help="Seed of splitting images", default=42)
+    parser.add_argument("--optimizer", type=str, help="Optimizer", default="Adam")
+    parser.add_argument(
+        "--scheduler", type=str, help="Scheduler", default="ReduceLROnPlateau"
+    )
     return parser.parse_args()
 
 
@@ -93,6 +97,8 @@ def main():
         f"loss-{args.loss_name}",
         f"ww-{args.ww}_",
         f"wl-{args.wl}_",
+        f"sched-{args.scheduler}_",
+        f"opt-{args.optimizer}_",
         f'{"no_val_" if args.no_val else ""}',
         f"seed-{args.seed}_",
     ]
@@ -178,10 +184,8 @@ def main():
                 args.multiclass,
                 model,
                 loss,
-                optim_name="SGD" if args.net_name == "transformer" else "Adam",
-                scheduler_name="Polynomial"
-                if args.net_name == "transformer"
-                else "ReduceLROnPlateau",
+                optim_name=args.optimizer,
+                scheduler_name=args.scheduler,
             )
             if args.no_val:
                 run_training(name, config, device, train_dataset)

@@ -495,7 +495,10 @@ def run_val_epoch(
         "val",
     )
     print_metrics(metrics, epoch_samples, "Val")
-    training_config.scheduler.step(metrics["loss"])
+    if training_config.scheduler_name == "polynomial":
+        training_config.scheduler.step()
+    else:
+        training_config.scheduler.step(metrics["loss"])
     if metrics["dice"] > training_config.best_dice:
         training_config.best_dice = metrics["dice"]
         training_config.best_model_wts = copy.deepcopy(training_config.net.state_dict())
