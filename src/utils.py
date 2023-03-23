@@ -495,7 +495,7 @@ def run_val_epoch(
         "val",
     )
     print_metrics(metrics, epoch_samples, "Val")
-    if training_config.scheduler_name == "polynomial":
+    if training_config.scheduler_name == "Polynomial":
         training_config.scheduler.step()
     else:
         training_config.scheduler.step(metrics["loss"])
