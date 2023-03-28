@@ -203,7 +203,7 @@ def main():
             finished = True
             test_config = TestingConfig(args.batch_size, args.multiclass, model, loss)
             dataset.test_mode = True
-            run_test(name, test_config, device, test_dataset)
+            run_test(name, test_config, device, test_dataset, True)
 
     sys.stdout = original_out
     log_file.close()

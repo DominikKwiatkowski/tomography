@@ -50,7 +50,7 @@ def training_arg_parser() -> argparse.Namespace:
         "--net_name",
         type=str,
         help="Network name",
-        choices=["unet", "quanet", "defednet", "unetplusplus"],
+        choices=["unet", "quanet", "defednet", "unetplusplus", "transformer"],
         required=True,
     )
     parser.add_argument(

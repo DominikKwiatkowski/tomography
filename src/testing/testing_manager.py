@@ -15,6 +15,7 @@ def run_test(
     testing_config: TestingConfig,
     device: torch.device,
     data_loader: DataLoader,
+    during_training: bool = False,
 ) -> None:
     """
     Runs the training loop.
@@ -22,9 +23,10 @@ def run_test(
     :param testing_config:
     :param weights_filename: name of the weights file
     :param data_loader: DataLoader object
+    :param during_training: if True, the model is loaded from wandb directory
     """
     print(f"Testing {weights_filename} on device: {device}")
-    utils.load_model(testing_config.net, weights_filename, device)
+    utils.load_model(testing_config.net, weights_filename, device, during_training)
 
     if torch.cuda.is_available():
         testing_config.net.cuda(device)
