@@ -412,6 +412,9 @@ def run_training_epoch(
             pbar.update(inputs.size(0))
             pbar.set_postfix(**{"loss (batch)": loss.item()})
     print_metrics(metrics, epoch_samples, "Train")
+    # if no validation and polynomial LR, update LR
+    if wandb.config["Scheduler"] == "Polynomial" and wandb.config["no_val"]:
+        training_config.scheduler.step()
     return metrics
 
 
