@@ -22,12 +22,12 @@ from src.models.transformer.factory import create_segmenter
 
 class TestingImages:
     def __init__(self):
-        self.best_dice = 0.0
+        self.best_dice = -1.0
         self.best_dice_img = None
         self.best_dice_mask = None
         self.best_dice_pred = None
 
-        self.worst_dice = 1.0
+        self.worst_dice = 1.1
         self.worst_dice_img = None
         self.worst_dice_mask = None
         self.worst_dice_pred = None
@@ -76,7 +76,7 @@ def calc_dice_and_check(
             imageStats.best_dice_img = input[i]
             imageStats.best_dice_mask = target[i]
             imageStats.best_dice_pred = pred[i]
-        if dice_score < imageStats.worst_dice and dice_score != 0:
+        if dice_score < imageStats.worst_dice:
             imageStats.worst_dice = dice_score
             imageStats.worst_dice_img = input[i]
             imageStats.worst_dice_mask = target[i]
@@ -413,7 +413,7 @@ def run_training_epoch(
             pbar.set_postfix(**{"loss (batch)": loss.item()})
     print_metrics(metrics, epoch_samples, "Train")
     # if no validation and polynomial LR, update LR
-    if wandb.config["Scheduler"] == "Polynomial" and wandb.config["no_val"]:
+    if wandb.config["scheduler"] == "Polynomial" and wandb.config["no_val"]:
         training_config.scheduler.step()
     return metrics
 
