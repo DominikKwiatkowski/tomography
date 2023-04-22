@@ -254,15 +254,24 @@ def create_model(
             num_classes=3 if multiclass else 1,
         ).float()
     elif net_name == "transformer":
-
+        if d_model == 192:
+            backbone = "vit_tiny_patch16_384"
+        elif d_model == 384:
+            backbone = "vit_small_patch16_384"
+        elif d_model == 768:
+            backbone = "vit_base_patch16_384"
+        elif d_model == 1024:
+            backbone = "vit_large_patch16_384"
+        else:
+            raise ValueError("Unknown d_model")
         cfg = dict(
-            backbone="vit_base_patch16_384",
+            backbone=backbone,
             d_model=d_model,
             decoder=dict(
                 drop_path_rate=0.1,
                 dropout=0.1,
                 n_cls=3 if multiclass else 1,
-                n_layers=12,
+                n_layers=2,
                 name="mask_transformer",
             ),
             distilled=False,
