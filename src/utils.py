@@ -227,7 +227,12 @@ class DiceLoss(nn.Module):
 
 
 def create_model(
-    net_name: str = "", multiclass: bool = True, img_size: int = 512
+    net_name: str = "",
+    multiclass: bool = True,
+    img_size: int = 512,
+    n_layers: int = 12,
+    n_heads: int = 12,
+    d_model: int = 768,
 ) -> nn.Module:
     if net_name == "unet":
         return UNet(
@@ -252,7 +257,7 @@ def create_model(
 
         cfg = dict(
             backbone="vit_base_patch16_384",
-            d_model=768,
+            d_model=d_model,
             decoder=dict(
                 drop_path_rate=0.1,
                 dropout=0.1,
@@ -265,8 +270,8 @@ def create_model(
             dropout=0.0,
             image_size=(img_size, img_size),
             n_cls=3 if multiclass else 1,
-            n_layers=12,
-            n_heads=12,
+            n_layers=n_layers,
+            n_heads=n_heads,
             patch_size=16,
             channels=1,
         )

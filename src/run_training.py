@@ -79,6 +79,15 @@ def training_arg_parser() -> argparse.Namespace:
     parser.add_argument(
         "--scheduler", type=str, help="Scheduler", default="ReduceLROnPlateau"
     )
+    parser.add_argument(
+        "--n_layers", type=int, help="Number of layers in transformer", default=12
+    )
+    parser.add_argument(
+        "--n_heads", type=int, help="Number of heads in transformer", default=12
+    )
+    parser.add_argument(
+        "--d_model", type=int, help="Dimension of model in transformer", default=768
+    )
     return parser.parse_args()
 
 
@@ -101,6 +110,9 @@ def main():
         f"opt-{args.optimizer}_",
         f'{"no_val_" if args.no_val else ""}',
         f"seed-{args.seed}_",
+        f"n_layers-{args.n_layers}_" if args.net_name == "transformer" else "",
+        f"n_heads-{args.n_heads}_" if args.net_name == "transformer" else "",
+        f"d_model-{args.d_model}_" if args.net_name == "transformer" else "",
     ]
     name_params = filter(None, name_params)
     base_name = "_".join(name_params)
@@ -139,7 +151,14 @@ def main():
     )
 
     if args.use_polar:
-        model = create_model(args.net_name, args.multiclass, args.img_size).to(device)
+        model = create_model(
+            args.net_name,
+            args.multiclass,
+            args.img_size,
+            n_layers=args.n_layers,
+            n_heads=args.n_heads,
+            d_model=args.d_model,
+        ).to(device)
         prepare_polar_images(
             dataset,
             base_name,
@@ -173,9 +192,14 @@ def main():
         wandb.config.update(args)
         wandb.run.name = f"{name}-{wandb.run.id}"
         try:
-            model = create_model(args.net_name, args.multiclass, args.img_size).to(
-                device
-            )
+            model = create_model(
+                args.net_name,
+                args.multiclass,
+                args.img_size,
+                n_layers=args.n_layers,
+                n_heads=args.n_heads,
+                d_model=args.d_model,
+            ).to(device)
             loss = create_loss(args.loss_name).to(device)
             config = TrainingConfig(
                 args.batch_size,
