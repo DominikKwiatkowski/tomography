@@ -114,6 +114,7 @@ def main():
         f"n_heads-{args.n_heads}_" if args.net_name == "transformer" else "",
         f"d_model-{args.d_model}_" if args.net_name == "transformer" else "",
     ]
+    test_batch = 8
     name_params = filter(None, name_params)
     base_name = "_".join(name_params)
 
@@ -182,7 +183,7 @@ def main():
         folds_data_loaders = dataset.create_k_fold_data_loaders(
             folds, batch_size=args.batch_size, seed=args.seed
         )
-    test_dataset = dataset.create_data_loader(test, args.batch_size, seed=args.seed)
+    test_dataset = dataset.create_data_loader(test, test_batch, seed=args.seed)
     print(test)
     rerun = 0
     finished = False
